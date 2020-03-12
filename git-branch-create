@@ -1,0 +1,66 @@
+#! /usr/bin/env bash
+
+# Check for arguments, else display message and exit
+if [ -z "$1" ]
+  then
+    echo "git-branch-create: A utility to create branches in all remotes of a repo."
+    echo
+    echo "Usage: brancher [--enforcingurl|-e=<url>] branch_name"
+    echo "enforcingurl - URL to change push url (default: DONTPUSH)"
+    exit 0
+fi
+
+# Get argument branch_name from command-line
+branch_name=$1
+
+# Default URL for checking against push url 
+URL='DONTPUSH'
+
+## Retrieve arguments
+## https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
+for i in "$@"
+do
+case $i in
+    -e=*|--enforcingurl=*)
+    URL="${i#*=}"
+    shift # past argument=value
+    ;;
+    *)
+          # unknown option
+    ;;
+esac
+done
+
+# echo 'Got enforcingurl='$URL
+
+# Check if git is installed
+git --version 2>&1 >/dev/null
+GIT_IS_AVAILABLE=$?
+
+if [ $GIT_IS_AVAILABLE -eq 0 ]; 
+    then
+        echo "This command will create branch '$1' in all upstreams."
+
+        read -p "Are you sure? (y/n): " -r
+        echo    # (optional) move to a new line
+        if [[ $REPLY =~ ^[Yy]$ ]]
+        then
+            echo "Creating local branch '$branch_name'..."
+            git branch -c $branch_name
+
+            # do dangerous stuff
+            for remote in $(git remote); 
+                do
+                    push_url=$(git remote get-url $remote --push)
+                    
+                    if [ $push_url != $URL ]; then
+                        echo
+                        echo "Creating branch '$branch_name' in '$remote' (url: $push_url)..."
+
+                        git push -u $remote $branch_name:$branch_name
+
+                        echo "Created '$branch_name' branch successfully."
+                    fi
+                done
+        fi
+fi
